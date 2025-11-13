@@ -1,0 +1,11 @@
+<script>
+  window.SIF_CONFIG = Object.assign({}, window.SIF_CONFIG || {}, {
+    /* Do not set instanceId here; block/button provides it. */
+    overlayText: "{{ settings.overlay_text | escape }}",
+    overlayBg: "{{ settings.overlay_bg }}",
+    overlayColor: "{{ settings.overlay_color }}"
+  });
+</script>
+<link rel="stylesheet" href="{{ 'sif-widget.css' | asset_url }}">
+<script src="{{ 'sif-widget.js' | asset_url }}" defer></script>
+

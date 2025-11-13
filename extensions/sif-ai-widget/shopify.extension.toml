@@ -1,0 +1,7 @@
+name = "sif-ai-widget"
+uid = "dcfb527f-e0bd-c2b1-37bf-1f96f5995d57ca24857c"
+type = "theme"
+
+# Optional: human-friendly description
+# description = "SeeItFirst theme extension providing an app block and embed runtime"
+

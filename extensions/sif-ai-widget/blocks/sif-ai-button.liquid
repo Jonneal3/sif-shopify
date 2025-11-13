@@ -1,0 +1,105 @@
+<div class="sif-ai-button-wrapper" data-instance="{{ block.settings.instance_id | escape }}" data-sif-product-id="{{ product.id }}" data-sif-product-gid="{{ product.admin_graphql_api_id }}" data-sif-product-handle="{{ product.handle }}" data-sif-product-title="{{ product.title | escape }}" style="text-align: {{ block.settings.btn_align }}; margin-top: {{ block.settings.btn_margin_top }}px; margin-bottom: {{ block.settings.btn_margin_bottom }}px;">
+  {% assign btn_id = 'sif-ai-button-' | append: block.id %}
+  <button
+    id="{{ btn_id }}"
+    type="button"
+    class="sif-ai-button"
+    style="
+      display: inline-block;
+      width: {% if block.settings.btn_width == 'full' %}100%{% else %}auto{% endif %};
+      padding: {{ block.settings.btn_padding_y }}px {{ block.settings.btn_padding_x }}px;
+      background: {% if block.settings.btn_variant == 'outline' or block.settings.btn_variant == 'ghost' %}transparent{% else %}{{ block.settings.btn_bg }}{% endif %};
+      color: {{ block.settings.btn_color }};
+      border: {% if block.settings.btn_variant == 'ghost' %}0{% else %}{{ block.settings.btn_border_width }}px solid {{ block.settings.btn_border_color }}{% endif %};
+      border-radius: {{ block.settings.btn_radius }}px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: {{ block.settings.btn_font_size }}px;
+      font-weight: {{ block.settings.btn_font_weight }};
+      letter-spacing: {{ block.settings.btn_letter_spacing }}px;
+      text-transform: {% if block.settings.btn_uppercase %}uppercase{% else %}none{% endif %};
+      box-shadow: {% if block.settings.btn_shadow %}0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04){% else %}none{% endif %};
+      transition: all .15s ease;
+    "
+    data-sif-instance-id="{{ block.settings.instance_id | escape }}"
+    {% if block.settings.instance_id == blank %}disabled title="Instance ID required. Set it in block settings or via the SeeItFirst app."{% endif %}
+  >
+    {{ block.settings.button_label }}
+  </button>
+</div>
+
+<style>
+  /* Hover styles are block-scoped using unique id */
+  #{% raw %}{{{% endraw %} btn_id {% raw %}}}{% endraw %}:hover {
+    {% if block.settings.btn_variant == 'outline' %}
+    background: {{ block.settings.btn_bg_hover }};
+    color: {{ block.settings.btn_color_hover }};
+    border-color: {{ block.settings.btn_border_color_hover }};
+    {% elsif block.settings.btn_variant == 'ghost' %}
+    background: {{ block.settings.btn_bg_hover }};
+    color: {{ block.settings.btn_color_hover }};
+    {% else %}
+    background: {{ block.settings.btn_bg_hover }};
+    color: {{ block.settings.btn_color_hover }};
+    border-color: {{ block.settings.btn_border_color_hover }};
+    {% endif %}
+  }
+</style>
+
+<link rel="stylesheet" href="{{ 'sif-widget.css' | asset_url }}">
+<script src="{{ 'sif-widget.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "SeeItFirst Button",
+  "target": "section",
+  "templates": ["product"],
+  "settings": [
+    { "type": "text", "id": "button_label", "label": "Button label", "default": "SeeItFirst" },
+    { "type": "text", "id": "instance_id", "label": "Instance ID", "info": "Required. Select an instance in the SeeItFirst app or paste its ID here." },
+
+    { "type": "select", "id": "btn_variant", "label": "Style variant", "default": "solid", "options": [
+      {"value": "solid", "label": "Solid"},
+      {"value": "outline", "label": "Outline"},
+      {"value": "ghost", "label": "Ghost"}
+    ]},
+
+    { "type": "color", "id": "btn_bg", "label": "Background", "default": "#111111" },
+    { "type": "color", "id": "btn_color", "label": "Text color", "default": "#ffffff" },
+    { "type": "color", "id": "btn_bg_hover", "label": "Background (hover)", "default": "#2a2a2a" },
+    { "type": "color", "id": "btn_color_hover", "label": "Text color (hover)", "default": "#ffffff" },
+
+    { "type": "color", "id": "btn_border_color", "label": "Border color", "default": "#1a1a1a" },
+    { "type": "color", "id": "btn_border_color_hover", "label": "Border color (hover)", "default": "#1a1a1a" },
+    { "type": "range", "id": "btn_border_width", "label": "Border width", "min": 0, "max": 4, "step": 1, "unit": "px", "default": 1 },
+    { "type": "range", "id": "btn_radius", "label": "Border radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 6 },
+
+    { "type": "range", "id": "btn_font_size", "label": "Font size", "min": 10, "max": 22, "step": 1, "unit": "px", "default": 14 },
+    { "type": "select", "id": "btn_font_weight", "label": "Font weight", "default": "600", "options": [
+      {"value": "400", "label": "Normal"},
+      {"value": "500", "label": "Medium"},
+      {"value": "600", "label": "Semibold"},
+      {"value": "700", "label": "Bold"}
+    ]},
+    { "type": "range", "id": "btn_letter_spacing", "label": "Letter spacing", "min": -1, "max": 5, "step": 1, "unit": "px", "default": 0 },
+    { "type": "checkbox", "id": "btn_uppercase", "label": "Uppercase text", "default": false },
+    { "type": "checkbox", "id": "btn_shadow", "label": "Subtle shadow", "default": false },
+
+    { "type": "range", "id": "btn_padding_y", "label": "Vertical padding", "min": 6, "max": 18, "step": 1, "unit": "px", "default": 10 },
+    { "type": "range", "id": "btn_padding_x", "label": "Horizontal padding", "min": 10, "max": 28, "step": 1, "unit": "px", "default": 14 },
+
+    { "type": "select", "id": "btn_width", "label": "Width", "default": "auto", "options": [
+      {"value": "auto", "label": "Auto"},
+      {"value": "full", "label": "Full width"}
+    ]},
+    { "type": "select", "id": "btn_align", "label": "Alignment", "default": "left", "options": [
+      {"value": "left", "label": "Left"},
+      {"value": "center", "label": "Center"},
+      {"value": "right", "label": "Right"}
+    ]},
+    { "type": "range", "id": "btn_margin_top", "label": "Margin top", "min": 0, "max": 32, "step": 1, "unit": "px", "default": 12 },
+    { "type": "range", "id": "btn_margin_bottom", "label": "Margin bottom", "min": 0, "max": 32, "step": 1, "unit": "px", "default": 12 }
+  ]
+}
+{% endschema %}
+

@@ -1,0 +1,12 @@
+.vercel
+node_modules
+
+# Secrets
+.env*
+shopify.app.secrets.toml
+
+# Build
+.next/
+node_modules/
+supabase/.temp/
+.DS_Store
