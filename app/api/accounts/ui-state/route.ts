@@ -12,6 +12,7 @@ type OverlayConfig = {
   text: string;
   bg: string;
   color: string;
+  position?: string; // 'top-left' | 'top-right' | 'top-center' | 'bottom-left' | 'bottom-right' | 'bottom-center' | 'center'
 };
 
 type UiState = {

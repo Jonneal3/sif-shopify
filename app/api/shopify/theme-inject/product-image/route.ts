@@ -3,6 +3,20 @@ import { getSupabaseServiceClient } from '@/lib/supabaseServer';
 
 const API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-01';
 
+// Helper function to convert position string to CSS styles
+function getPositionStyles(position: string = 'bottom-right'): string {
+  const positions: Record<string, string> = {
+    'top-left': 'top:8px;left:8px;',
+    'top-right': 'top:8px;right:8px;',
+    'top-center': 'top:8px;left:50%;transform:translateX(-50%);',
+    'bottom-left': 'bottom:8px;left:8px;',
+    'bottom-right': 'bottom:8px;right:8px;',
+    'bottom-center': 'bottom:8px;left:50%;transform:translateX(-50%);',
+    'center': 'top:50%;left:50%;transform:translate(-50%,-50%);',
+  };
+  return positions[position] || positions['bottom-right'];
+}
+
 // Simple in-memory rate limiter (reset after 10 seconds)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 10000; // 10 seconds
@@ -123,6 +137,7 @@ export async function POST(req: NextRequest) {
       overlay_text,
       overlay_bg,
       overlay_color,
+      overlay_position,
       instance_id,
       enable_overlay,
     } = await req.json();
@@ -215,10 +230,116 @@ export async function POST(req: NextRequest) {
     const ovText = (overlay_text ?? 'SeeItFirst') as string;
     const ovBg = (overlay_bg ?? 'rgba(0,0,0,0.6)') as string;
     const ovColor = (overlay_color ?? '#fff') as string;
+    const ovPosition = (overlay_position ?? 'bottom-right') as string;
+    const positionStyles = getPositionStyles(ovPosition);
     const overlayKey = 'snippets/sif-ai-overlay.liquid';
     const overlayRenderTag = "{% render 'sif-ai-overlay' %}";
     const overlayRenderTagDecorated = buildDecoratedRenderTag(overlayRenderTag, 'overlay', instance_id);
-    const overlayTag = `<div id="sif-ai-overlay" data-sif-instance-id="${(instance_id || '')}" data-sif-overlay-text="${ovText}" data-sif-overlay-bg="${ovBg}" data-sif-overlay-color="${ovColor}" style="position:absolute;right:8px;bottom:8px;background:${ovBg};color:${ovColor};padding:6px 10px;border-radius:6px;cursor:pointer;z-index:2147483647" onclick="(window.SIF_OPEN_MODAL && window.SIF_OPEN_MODAL())">${ovText}</div>`;
+    
+    // Create overlay snippet - resilient to all rendering contexts
+    // Use global initialization that works even when script tags are stripped
+    const overlaySnippet = `<link rel="stylesheet" href="{{ 'sif-widget.css' | asset_url }}">
+<script src="{{ 'sif-widget.js' | asset_url }}"></script>
+<div id="sif-ai-overlay" data-sif-instance-id="${(instance_id || '')}" data-sif-shop="{{ shop.permanent_domain | default: shop.domain }}" data-sif-product-id="{{ product.id }}" data-sif-overlay-text="${ovText}" data-sif-overlay-bg="${ovBg}" data-sif-overlay-color="${ovColor}" style="position:absolute;${positionStyles}background:${ovBg};color:${ovColor};padding:6px 10px;border-radius:6px;cursor:pointer;z-index:2147483647">${ovText}</div>
+<script>
+(function(){
+  if (!window.SIF_OVERLAY_INIT) {
+    window.SIF_OVERLAY_INIT = true;
+    
+    function initOverlayHandler(overlay) {
+      if (!overlay || overlay.__sif_bound) return;
+      overlay.__sif_bound = true;
+      
+      var instanceId = overlay.getAttribute('data-sif-instance-id');
+      if (!instanceId) return;
+      
+      function openModal(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        
+        // Get shop and product_id directly from data attributes (set by Liquid)
+        var shop = overlay.getAttribute('data-sif-shop') || (window.Shopify && window.Shopify.shop) || window.location.hostname;
+        var productId = overlay.getAttribute('data-sif-product-id') || '';
+        
+        console.log('[SIF] Overlay click:', {
+          instanceId: instanceId,
+          shop: shop,
+          productId: productId,
+          dataAttributes: {
+            shop: overlay.getAttribute('data-sif-shop'),
+            productId: overlay.getAttribute('data-sif-product-id')
+          }
+        });
+        
+        // Build context object
+        var ctx = { shop: shop };
+        if (productId) {
+          ctx.productId = productId;
+        }
+        
+        console.log('[SIF] Sending context to widget:', ctx);
+        
+        if (window.SIF_OPEN_MODAL && typeof window.SIF_OPEN_MODAL === 'function') {
+          try {
+            window.SIF_OPEN_MODAL(instanceId, ctx);
+            return;
+          } catch(err) {
+            console.error('[SIF] Error opening modal:', err);
+          }
+        }
+        
+        var attempts = 0;
+        var maxAttempts = 50;
+        var checkInterval = setInterval(function() {
+          attempts++;
+          if (window.SIF_OPEN_MODAL && typeof window.SIF_OPEN_MODAL === 'function') {
+            clearInterval(checkInterval);
+            try {
+              window.SIF_OPEN_MODAL(instanceId, ctx);
+            } catch(err) {
+              console.error('[SIF] Error opening modal:', err);
+            }
+          } else if (attempts >= maxAttempts) {
+            clearInterval(checkInterval);
+            console.warn('[SIF] Widget not loaded');
+          }
+        }, 100);
+      }
+      
+      overlay.addEventListener('click', openModal);
+    }
+    
+    function findAndInitOverlays() {
+      var overlays = document.querySelectorAll('#sif-ai-overlay');
+      for (var i = 0; i < overlays.length; i++) {
+        initOverlayHandler(overlays[i]);
+      }
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', findAndInitOverlays);
+    } else {
+      findAndInitOverlays();
+    }
+    
+    var observer = new MutationObserver(function() {
+      findAndInitOverlays();
+    });
+    try {
+      observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+    } catch(_) {}
+    
+    document.addEventListener('shopify:section:load', findAndInitOverlays);
+    document.addEventListener('shopify:section:select', findAndInitOverlays);
+    
+    findAndInitOverlays();
+  }
+})();
+</script>`;
+    
+    const overlayTag = overlaySnippet;
 
     const updated: string[] = [];
     const failed: Array<{ key: string; reason: string }> = [];
@@ -291,5 +412,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e?.message || 'product-image injection failed' }, { status: 500 });
   }
 }
+
 
 

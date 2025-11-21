@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { Card, Layout, Link, Page, Button, Text } from '@shopify/polaris';
+import { Card, Layout, Link, Page, Button, Text, Banner, Badge } from '@shopify/polaris';
 import { useEffect, useState } from 'react';
 import { getSupabaseEmbedded } from '@/lib/supabaseEmbedded';
 
@@ -109,31 +109,7 @@ export default function HomePage() {
     }
   }, [installChecked, needsInstall]);
 
-  // After session is ready, route to the correct next step based on whether an account is already connected
-  useEffect(() => {
-    const routeNext = async () => {
-      if (!sessionChecked || needsLogin || needsInstall) return;
-      const shop = shopParam || (typeof window !== 'undefined' ? localStorage.getItem('sif_last_shop') : null);
-      const host = hostParam || (typeof window !== 'undefined' ? localStorage.getItem('sif_last_host') : null);
-      if (!shop) return; // no shop context; remain on page
-      setChecking(true); // show loader while deciding where to go
-      try {
-        const res = await fetch(`/api/accounts/active?shop=${encodeURIComponent(shop)}`);
-        const json = await res.json();
-        const qp = new URLSearchParams();
-        qp.set('shop', shop);
-        if (host) qp.set('host', host);
-        if (json?.connected && json?.account_id) {
-          qp.set('account_id', json.account_id);
-          location.assign(`/instances?${qp.toString()}`);
-        } else {
-          location.assign(`/accounts?${qp.toString()}`);
-        }
-      } catch {}
-    };
-    routeNext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionChecked, needsLogin, needsInstall]);
+  // Don't auto-redirect - show landing page instead
 
   const onInstall = () => {
     const sp = new URLSearchParams(window.location.search);
@@ -162,7 +138,6 @@ export default function HomePage() {
 
   return (
     <Page
-      title="seeitFirst"
       primaryAction={!checking && !needsLogin ? { content: 'Logout', onAction: onLogout } : undefined}
     >
       <Layout>
@@ -188,11 +163,112 @@ export default function HomePage() {
                   <Button onClick={onInlineLogin} variant="primary">Open sign-in</Button>
                 </div>
               ) : (
-                <div>
-                  <p>Welcome to your embedded app.</p>
-                  <div style={{ marginTop: 12 }}>
-                    <Link url={`/accounts?${qpStr}`}>View your accounts</Link>
+                <div style={{ display: 'grid', gap: 24 }}>
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    <Text as="h1" variant="headingXl">You are currently setup and using the app!</Text>
+                    <Text as="p" variant="bodyLg" tone="subdued">
+                      SeeItFirst is active and ready to use. Manage your accounts, instances, and customize your product overlays.
+                    </Text>
                   </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <Card>
+                      <div style={{ padding: 20, display: 'grid', gap: 16 }}>
+                        <Text as="h3" variant="headingSm" fontWeight="semibold">Where to find SeeItFirst</Text>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Add the SeeItFirst button to your product pages:
+                          </Text>
+                          <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 8 }}>
+                            <li><Text as="span" variant="bodySm">Online Store → Themes → <strong>Customize</strong></Text></li>
+                            <li><Text as="span" variant="bodySm">Go to any <strong>Product page</strong></Text></li>
+                            <li><Text as="span" variant="bodySm">Click <strong>Add block</strong> → App blocks</Text></li>
+                            <li><Text as="span" variant="bodySm">Select <strong>SeeItFirst Button</strong></Text></li>
+                            <li><Text as="span" variant="bodySm">Drag to position and save</Text></li>
+                          </ol>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card>
+                      <div style={{ padding: 20, display: 'grid', gap: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Text as="h3" variant="headingSm" fontWeight="semibold">Product Overlay Buttons</Text>
+                          <Badge tone="info">NEW</Badge>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gap: 12 }}>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Add a button overlay directly on product images. Quick setup, fully customizable.
+                          </Text>
+                          
+                          {/* Preview example */}
+                          <div style={{ 
+                            position: 'relative', 
+                            width: '100%', 
+                            height: 140, 
+                            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', 
+                            border: '1px solid #e5e5e5', 
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                          }}>
+                            <div style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              background: 'linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)',
+                              backgroundSize: '20px 20px',
+                              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+                              position: 'relative'
+                            }}>
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  bottom: 10,
+                                  right: 10,
+                                  background: 'rgba(0,0,0,0.7)',
+                                  color: '#fff',
+                                  padding: '6px 12px',
+                                  borderRadius: 6,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                                }}
+                              >
+                                SeeItFirst
+                              </div>
+                            </div>
+                          </div>
+
+                          <Button 
+                            variant="primary" 
+                            fullWidth
+                            onClick={() => {
+                              const qp = new URLSearchParams();
+                              if (shopParam) qp.set('shop', shopParam);
+                              if (hostParam) qp.set('host', hostParam);
+                              location.assign(`/setup-overlay?${qp.toString()}`);
+                            }}
+                          >
+                            Set up Overlay
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+                      <Text as="h2" variant="headingMd">Resources</Text>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        <Link url={`/accounts?${qpStr}`}>
+                          <Text as="span" variant="bodyMd">View your accounts</Text>
+                        </Link>
+                        <Link url={`/instances?${qpStr}`}>
+                          <Text as="span" variant="bodyMd">Manage instances</Text>
+                        </Link>
+                      </div>
+                    </div>
+                  </Card>
                 </div>
               )}
             </div>

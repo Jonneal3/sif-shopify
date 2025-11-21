@@ -13,6 +13,46 @@ type Instance = {
   account_id: string | null;
 };
 
+// Helper functions for color conversion
+const rgbaToHex = (rgba: string): string => {
+  if (rgba?.startsWith('#')) return rgba;
+  const match = rgba?.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return '#000000';
+  const r = parseInt(match[1] || '0');
+  const g = parseInt(match[2] || '0');
+  const b = parseInt(match[3] || '0');
+  return `#${[r, g, b].map(x => x.toString(16).padStart(2, '0')).join('')}`;
+};
+
+const hexToRgba = (hex: string, originalRgba?: string): string => {
+  if (!hex.startsWith('#')) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  
+  // Preserve alpha from original if it was rgba
+  if (originalRgba?.includes('rgba')) {
+    const alphaMatch = originalRgba.match(/rgba?\([^)]+,\s*([\d.]+)\)/);
+    const alpha = alphaMatch ? alphaMatch[1] : '0.6';
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return hex;
+};
+
+// Helper function to get position styles for preview
+const getPositionStyles = (position: string): React.CSSProperties => {
+  const styles: Record<string, React.CSSProperties> = {
+    'top-left': { top: 8, left: 8 },
+    'top-right': { top: 8, right: 8 },
+    'top-center': { top: 8, left: '50%', transform: 'translateX(-50%)' },
+    'bottom-left': { bottom: 8, left: 8 },
+    'bottom-right': { bottom: 8, right: 8 },
+    'bottom-center': { bottom: 8, left: '50%', transform: 'translateX(-50%)' },
+    'center': { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+  };
+  return styles[position] || styles['bottom-right'];
+};
+
 export default function InstancesPage() {
   const authedFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init), []);
   const [loading, setLoading] = useState(true);
@@ -31,16 +71,13 @@ export default function InstancesPage() {
   const [selectionSaving, setSelectionSaving] = useState<boolean>(false);
   const [themeInjectLoading, setThemeInjectLoading] = useState<boolean>(false);
   const [saveConfigLoading, setSaveConfigLoading] = useState<boolean>(false);
-  const [manualApplyLoading, setManualApplyLoading] = useState<boolean>(false);
-  const [checkThemesLoading, setCheckThemesLoading] = useState<boolean>(false);
   const [configUpdateLoading, setConfigUpdateLoading] = useState<boolean>(false);
   // Customization state (overlay only)
   const [overlayText, setOverlayText] = useState<string>('SeeItFirst');
   const [overlayBg, setOverlayBg] = useState<string>('rgba(0,0,0,0.6)');
   const [overlayColor, setOverlayColor] = useState<string>('#fff');
+  const [overlayPosition, setOverlayPosition] = useState<string>('bottom-right');
   const [showImgConfig, setShowImgConfig] = useState<boolean>(false);
-  const [themes, setThemes] = useState<Array<{ value: string; label: string }>>([]);
-  const [selectedThemeId, setSelectedThemeId] = useState<string>('');
   const [storeId, setStoreId] = useState<string | null>(null);
   const [serverHydrated, setServerHydrated] = useState<boolean>(false);
   const lastAppliedConfig = useRef<string>('');
@@ -240,6 +277,7 @@ export default function InstancesPage() {
           if (typeof ov.text === 'string') setOverlayText(ov.text);
           if (typeof ov.bg === 'string') setOverlayBg(ov.bg);
           if (typeof ov.color === 'string') setOverlayColor(ov.color);
+          if (typeof ov.position === 'string') setOverlayPosition(ov.position);
         } else {
           // Fallback to legacy fields
           if (typeof accountState?.overlay_text === 'string') setOverlayText(accountState.overlay_text);
@@ -367,12 +405,12 @@ export default function InstancesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             shop,
-            theme_id: selectedThemeId || undefined,
             instance_id: selectedId,
             enable_overlay: value,
             overlay_text: overlayText,
             overlay_bg: overlayBg,
             overlay_color: overlayColor,
+            overlay_position: overlayPosition,
           }),
         });
         const json = await resp.json();
@@ -400,6 +438,7 @@ export default function InstancesPage() {
               text: overlayText,
               bg: overlayBg,
               color: overlayColor,
+              position: overlayPosition,
             },
           }),
         });
@@ -417,7 +456,7 @@ export default function InstancesPage() {
   // Debounced reinstall when customization changes (only if placements are enabled)
   const currentConfigSignature = () => {
     return JSON.stringify({
-      overlayText, overlayBg, overlayColor,
+      overlayText, overlayBg, overlayColor, overlayPosition,
       inst: selectedId, shop,
     });
   };
@@ -463,12 +502,12 @@ export default function InstancesPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               shop,
-              theme_id: selectedThemeId || undefined,
               instance_id: selectedId,
               enable_overlay: true,
               overlay_text: overlayText,
               overlay_bg: overlayBg,
               overlay_color: overlayColor,
+              overlay_position: overlayPosition,
             }),
           });
           const j = await respOv.json();
@@ -498,6 +537,7 @@ export default function InstancesPage() {
                   text: overlayText,
                   bg: overlayBg,
                   color: overlayColor,
+                  position: overlayPosition,
                 },
               }),
             });
@@ -520,7 +560,7 @@ export default function InstancesPage() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overlayText, overlayBg, overlayColor, selectedId, shop, placeProductImageButton, serverHydrated]);
+  }, [overlayText, overlayBg, overlayColor, overlayPosition, selectedId, shop, placeProductImageButton, serverHydrated]);
 
   const onGrantPermission = () => {
     if (!shop) return;
@@ -627,20 +667,119 @@ export default function InstancesPage() {
                       {showImgConfig ? '▼' : '▶'} Customize product image overlay
                     </button>
                     {showImgConfig ? (
-                      <div style={{ display: 'grid', gap: 8, paddingTop: 6 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <TextField label="Overlay text" value={overlayText} onChange={(v) => setOverlayText(v)} disabled={!selectedId || !placeProductImageButton} autoComplete="off" />
-                          <div />
-                          <TextField label="Overlay background" value={overlayBg} onChange={(v) => setOverlayBg(v)} disabled={!selectedId || !placeProductImageButton} autoComplete="off" />
-                          <TextField label="Overlay text color" value={overlayColor} onChange={(v) => setOverlayColor(v)} disabled={!selectedId || !placeProductImageButton} autoComplete="off" />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, paddingTop: 6 }}>
+                        <div style={{ display: 'grid', gap: 12 }}>
+                          <TextField 
+                            label="Overlay text" 
+                            value={overlayText} 
+                            onChange={(v) => setOverlayText(v)} 
+                            disabled={!selectedId || !placeProductImageButton} 
+                            autoComplete="off" 
+                          />
+                          
+                          <div style={{ display: 'grid', gap: 4 }}>
+                            <Text as="p" variant="bodyMd" fontWeight="medium">Overlay background</Text>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <div style={{ 
+                                width: 40, 
+                                height: 40, 
+                                borderRadius: 6, 
+                                border: '1px solid #e5e5e5',
+                                background: overlayBg || 'rgba(0,0,0,0.6)',
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}>
+                                <input
+                                  type="color"
+                                  value={rgbaToHex(overlayBg || 'rgba(0,0,0,0.6)')}
+                                  onChange={(e) => {
+                                    const hex = e.target.value;
+                                    setOverlayBg(hexToRgba(hex, overlayBg));
+                                  }}
+                                  disabled={!selectedId || !placeProductImageButton}
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '100%', 
+                                    opacity: 0, 
+                                    cursor: 'pointer',
+                                    border: 'none',
+                                    padding: 0,
+                                    margin: 0
+                                  }}
+                                />
+                              </div>
+                              <TextField 
+                                label=""
+                                value={overlayBg} 
+                                onChange={(v) => setOverlayBg(v)} 
+                                disabled={!selectedId || !placeProductImageButton} 
+                                autoComplete="off"
+                                placeholder="rgba(0,0,0,0.6) or #000000"
+                              />
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'grid', gap: 4 }}>
+                            <Text as="p" variant="bodyMd" fontWeight="medium">Overlay text color</Text>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <div style={{ 
+                                width: 40, 
+                                height: 40, 
+                                borderRadius: 6, 
+                                border: '1px solid #e5e5e5',
+                                background: overlayColor || '#ffffff',
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}>
+                                <input
+                                  type="color"
+                                  value={rgbaToHex(overlayColor || '#ffffff')}
+                                  onChange={(e) => setOverlayColor(e.target.value)}
+                                  disabled={!selectedId || !placeProductImageButton}
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '100%', 
+                                    opacity: 0, 
+                                    cursor: 'pointer',
+                                    border: 'none',
+                                    padding: 0,
+                                    margin: 0
+                                  }}
+                                />
+                              </div>
+                              <TextField 
+                                label=""
+                                value={overlayColor} 
+                                onChange={(v) => setOverlayColor(v)} 
+                                disabled={!selectedId || !placeProductImageButton} 
+                                autoComplete="off"
+                                placeholder="#ffffff"
+                              />
+                            </div>
+                          </div>
+
+                          <Select
+                            label="Button position"
+                            options={[
+                              { label: 'Top left', value: 'top-left' },
+                              { label: 'Top right', value: 'top-right' },
+                              { label: 'Top center', value: 'top-center' },
+                              { label: 'Bottom left', value: 'bottom-left' },
+                              { label: 'Bottom right', value: 'bottom-right' },
+                              { label: 'Bottom center', value: 'bottom-center' },
+                              { label: 'Center', value: 'center' },
+                            ]}
+                            value={overlayPosition}
+                            onChange={(v) => setOverlayPosition(v)}
+                            disabled={!selectedId || !placeProductImageButton}
+                          />
                         </div>
-                        {/* Live preview */}
+                        {/* Live preview - moved to the right */}
                         <div style={{ position: 'relative', width: 280, height: 160, background: '#f4f4f5', border: '1px solid #e5e5e5', borderRadius: 8 }}>
                           <div
                             style={{
                               position: 'absolute',
-                              right: 8,
-                              bottom: 8,
+                              ...getPositionStyles(overlayPosition),
                               background: overlayBg,
                               color: overlayColor,
                               padding: '6px 10px',
@@ -650,78 +789,6 @@ export default function InstancesPage() {
                           >
                             {overlayText || 'SeeItFirst'}
                           </div>
-                        </div>
-                        <div>
-                          <Button
-                            onClick={async () => {
-                              if (!shop) return;
-                              setManualApplyLoading(true);
-                              setErrorInstall(null);
-                              setNotice(null);
-                              try {
-                                const resp = await authedFetch('/api/shopify/theme-inject/product-image', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    shop,
-                                    theme_id: selectedThemeId || undefined,
-                                    instance_id: selectedId,
-                                    enable_overlay: placeProductImageButton,
-                                    overlay_text: overlayText,
-                                    overlay_bg: overlayBg,
-                                    overlay_color: overlayColor,
-                                  }),
-                                });
-                                const json = await resp.json();
-                                if (!resp.ok) throw new Error(json?.error || 'Theme injection failed');
-                                setNotice(`Overlay snippet inserted. Theme ${json.theme_id}. Updated: ${(json.updated || []).join(', ') || 'none'}`);
-                              } catch (e: any) {
-                                setErrorInstall(e?.message || 'Theme injection failed');
-                              } finally {
-                                setManualApplyLoading(false);
-                              }
-                            }}
-                            disabled={!shop}
-                            loading={manualApplyLoading}
-                          >
-                            Apply overlay to theme
-                          </Button>
-                          <Button
-                            onClick={async () => {
-                              if (!shop) return;
-                              setCheckThemesLoading(true);
-                              setErrorInstall(null);
-                              setNotice(null);
-                              try {
-                                const resp = await authedFetch(`/api/shopify/themes?shop=${encodeURIComponent(shop)}`);
-                                const json = await resp.json();
-                                if (!resp.ok) throw new Error(json?.error || 'Failed to list themes');
-                                const opts = (json.themes || []).map((t: any) => ({ value: String(t.id), label: `${t.id} • ${t.name} • ${t.role}` }));
-                                setThemes(opts);
-                                const main = (json.themes || []).find((t: any) => t.role === 'main');
-                                if (main?.id) setSelectedThemeId(String(main.id));
-                                setNotice(`Loaded ${opts.length} themes`);
-                              } catch (e: any) {
-                                setErrorInstall(e?.message || 'Failed to list themes');
-                              } finally {
-                                setCheckThemesLoading(false);
-                              }
-                            }}
-                            disabled={!shop}
-                            loading={checkThemesLoading}
-                          >
-                            Check themes
-                          </Button>
-                          {themes.length > 0 ? (
-                            <div style={{ marginTop: 8, maxWidth: 520 }}>
-                              <Select
-                                label="Target theme"
-                                options={themes}
-                                onChange={(v) => setSelectedThemeId(v)}
-                                value={selectedThemeId}
-                              />
-                            </div>
-                          ) : null}
                         </div>
                       </div>
                     ) : null}
